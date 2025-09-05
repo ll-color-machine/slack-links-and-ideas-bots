@@ -1,0 +1,29 @@
+{
+  "name": "slack-links-and-ideas-bots",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/ll-color-machine/slack-links-and-ideas-bots#readme",
+  "bugs": {
+    "url": "https://github.com/ll-color-machine/slack-links-and-ideas-bots/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ll-color-machine/slack-links-and-ideas-bots.git"
+  },
+  "license": "MIT",
+  "author": "mk",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "NODE_ENV=dev nodemon app.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.4.0",
+    "airtable": "^0.12.2",
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.2",
+    "learninglab-log": "^1.1.0",
+    "openai": "^5.19.1"
+  }
+}
