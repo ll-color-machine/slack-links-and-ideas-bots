@@ -4,6 +4,7 @@ var fs = require("fs");
 const llog = require("learninglab-log");
 const handleMessages = require("./src/handlers/message-handler");
 const handlers = require("./src/handlers");
+const { initRuntimeConfig, refreshRuntimeConfig, syncSlackUsersToAirtable } = require("./src/config");
 global.ROOT_DIR = path.resolve(__dirname);
 
 require("dotenv").config({
@@ -33,8 +34,18 @@ app.event("reaction_added", handlers.eventHandler.reactionAdded);
   if (!fs.existsSync("_output")) {
     fs.mkdirSync("_output");
   }
+  if (!fs.existsSync("_cache")) {
+    fs.mkdirSync("_cache");
+  }
+
+  // Warm runtime config (users, emojis, prompts, flows)
+  await initRuntimeConfig();
+  // Ensure Airtable Users table contains all Slack users for this workspace
+  await syncSlackUsersToAirtable({ slackClient: app.client }).catch(()=>{});
+  // Refresh config again to include any new/updated users immediately
+  await refreshRuntimeConfig().catch(()=>{});
   await app.start(process.env.PORT || 3000);
-  llog.yellow("⚡️ Bolt app is running!", process.env.OPENAI_API_KEY);
+  llog.yellow("⚡️ Bolt app is running!");
   let slackResult = await app.client.chat.postMessage({
     channel: process.env.SLACK_LOGGING_CHANNEL,
     text: "starting up the links-and-ideas-bots",

@@ -141,3 +141,9 @@ vite.config.ts.timestamp-*
 
 .env*
 .DS_Store
+
+# Project-specific temp/cache/output directories
+_cache/
+_temp/
+_output/
+

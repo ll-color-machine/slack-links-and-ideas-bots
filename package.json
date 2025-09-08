@@ -16,7 +16,16 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "NODE_ENV=dev nodemon app.js"
+    "dev": "NODE_ENV=dev nodemon",
+    "start": "NODE_ENV=production node --require ./console-file-logger.cjs app.js"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "logs/**/*",
+      "_cache/**/*",
+      "_temp/**/*",
+      "_output/**/*"
+    ]
   },
   "dependencies": {
     "@slack/bolt": "^4.4.0",
@@ -24,6 +33,7 @@
     "axios": "^1.11.0",
     "dotenv": "^17.2.2",
     "learninglab-log": "^1.1.0",
-    "openai": "^5.19.1"
+    "openai": "^5.19.1",
+    "zod": "^3.23.8"
   }
 }

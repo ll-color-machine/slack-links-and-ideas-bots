@@ -1,17 +1,13 @@
 const llog = require("learninglab-log");
 const airtableTools = require(`../utils/ll-airtable-tools`);
-const PDFBot = require("../bots/pdf-bot");
-// const { handleSlackedFcpxml } =  require('../bots/fcpxml-bot/fcpxml-tools')
+const { processFile: processPdfFile } = require("../bots/pdf-bot");
+const payloadLogger = require("../utils/payload-logger");
 const path = require("path");
-// const appHomeHandler = require('./app-home-handler')
-// const handleImageFile = require(`../bots/image-bot/external-link-listener`)
-// const makeGif = require('../bots/gif-bot/make-gif')
-// const momentBot = require('../bots/moment-bot')
 
 exports.fileShared = async ({ event, client }) => {
   try {
-    llog.cyan("📁 FILE SHARED EVENT:");
-    llog.blue(event);
+    await payloadLogger.logEvent(event, 'file_shared');
+    llog.cyan("📁 FILE SHARED EVENT:", event);
 
     const fileId = event.file_id;
     const channelId = event.channel_id;
@@ -51,9 +47,8 @@ exports.fileShared = async ({ event, client }) => {
 
     llog.green(`🔍 PDF detected: ${fileName}`);
 
-    // Process with PDF bot
-    const pdfBot = PDFBot({ slackClient: client });
-    await pdfBot.processFile(file, channelId, { thread_ts });
+    // Process with PDF bot (standalone function)
+    await processPdfFile({ slackClient: client }, { file, channelId, thread_ts });
   } catch (error) {
     llog.red(`❌ Error handling file_shared event: ${error}`);
     llog.blue(event);
@@ -121,8 +116,8 @@ const explainRequest = async ({ event, client }) => {
 };
 
 exports.reactionAdded = async ({ event, client }) => {
+  await payloadLogger.logEvent(event, 'reaction_added');
   llog.yellow(`got a reactionAdded: ${event.type}:`);
-  llog.cyan(event);
   // Trigger PDF processing when :books: is added to a message containing PDFs
   try {
     if (event.reaction === "books") {
@@ -151,10 +146,9 @@ exports.reactionAdded = async ({ event, client }) => {
         return;
       }
 
-      const pdfBot = PDFBot({ slackClient: client });
       for (const file of pdfs) {
         llog.magenta(`🔄 Processing PDF from books reaction: ${file.name || "Unknown"}`);
-        await pdfBot.processFile(file, channel, { thread_ts: timestamp });
+        await processPdfFile({ slackClient: client }, { file, channelId: channel, thread_ts: timestamp });
       }
       return; // Do not fall through
     }
@@ -175,13 +169,14 @@ exports.reactionAdded = async ({ event, client }) => {
 };
 
 exports.reactionRemoved = async ({ event }) => {
+  await payloadLogger.logEvent(event, 'reaction_removed');
   llog.yellow(`got a reactionRemoved ${event.type}:`);
-  llog.cyan(event);
 };
 
 // exports.appHomeOpened = appHomeHandler
 
 exports.parseAll = async ({ event }) => {
+  await payloadLogger.logEvent(event, event.type || 'unknown');
   const handledEvents = [
     "message",
     "reaction_added",
@@ -194,7 +189,6 @@ exports.parseAll = async ({ event }) => {
     // magenta(event)
   } else {
     llog.yellow(`currently unhandled event of type ${event.type}:`);
-    llog.cyan(JSON.stringify(event));
   }
   // const result = await momentBot.momentEventListener(event)
 };

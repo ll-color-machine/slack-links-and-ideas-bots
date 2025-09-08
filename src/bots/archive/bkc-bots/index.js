@@ -13,22 +13,49 @@ const wait = (seconds) => new Promise(resolve => setTimeout(resolve, seconds * 1
  * - Icon
  */
 async function getAgents() {
-  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_TOKEN })
-    .base(process.env.AIRTABLE_BKC_BASE_ID);
+  const apiKey = process.env.AIRTABLE_API_TOKEN;
+  const baseId = process.env.AIRTABLE_BKC_BASE_ID;
+  if (!apiKey || !baseId) {
+    llog.gray("BKC Agents disabled: missing AIRTABLE_API_TOKEN or AIRTABLE_BKC_BASE_ID");
+    return [];
+  }
 
-  return new Promise((resolve, reject) => {
-    base('Agents').select({view: "ACTIVE"}).firstPage((err, records) => {
+  const base = new Airtable({ apiKey }).base(baseId);
+
+  const fetchPage = (selectOpts) => new Promise((resolve, reject) => {
+    base('Agents').select(selectOpts || {}).firstPage((err, records) => {
       if (err) return reject(err);
-      const agents = records.map(record => ({
-        name: record.get('Name'),
-        framingPrompt: record.get('FramingPrompt'),
-        extraInstructions: record.get('ExtraInstructions'),
-        icon: record.get('Icon')
-      }));
-      llog.magenta("Agents loaded:", agents);
-      resolve(agents);
+      resolve(records || []);
     });
   });
+
+  try {
+    // Try ACTIVE view first
+    let records = await fetchPage({ view: "ACTIVE" });
+    if (!records.length) {
+      // Fallback to default view
+      records = await fetchPage();
+    }
+    const agents = records.map(record => ({
+      name: record.get('Name'),
+      framingPrompt: record.get('FramingPrompt'),
+      extraInstructions: record.get('ExtraInstructions'),
+      icon: record.get('Icon')
+    }));
+    if (!agents.length) llog.gray("No agents found in Airtable (Agents table)");
+    else llog.magenta("Agents loaded:", agents);
+    return agents;
+  } catch (err) {
+    // Swallow NOT_FOUND / 404 and proceed without agents
+    const code = err?.statusCode || err?.status || err?.code;
+    const tag = err?.error || err?.message || String(err);
+    if (code === 404 || tag?.includes('NOT_FOUND')) {
+      llog.gray("Agents table/view not found; skipping BKC agents.");
+      return [];
+    }
+    llog.yellow(`Problem loading agents (${code || 'unknown'}): ${tag}`);
+    return [];
+  }
 }
 
 /**
@@ -113,11 +140,9 @@ async function processAgent(agent, { client, message }, lastBotResponse = null) 
 module.exports = async ({ client, message, say, event }) => {
   llog.cyan("Processing message with multiple agents");
 
-  let agents;
-  try {
-    agents = await getAgents();
-  } catch (error) {
-    console.error("Error loading agents:", error);
+  const agents = await getAgents();
+  if (!agents.length) {
+    llog.gray("No BKC agents configured; skipping.");
     return;
   }
 

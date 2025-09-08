@@ -1,0 +1,13 @@
+{
+  "watch": ["src"],
+  "ext": "js,ts,json",
+  "ignore": [
+    "logs/**/*",
+    "node_modules/*",
+    ".git/*",
+    "_cache/**/*",
+    "_temp/**/*",
+    "_output/**/*"
+  ],
+  "exec": "node --require ./console-file-logger.cjs app.js"
+}
