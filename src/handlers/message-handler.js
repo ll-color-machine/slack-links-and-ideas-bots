@@ -18,7 +18,7 @@ exports.parseAll = async ({ client, message, say, event }) => {
     await payloadLogger.logMessage(message, 'parseAll');
     // Save every message to Airtable (includes subthreads and bot messages)
     upsertSlackMessage({ message, event }).catch(()=>{});
-    llog.cyan("got a message the day of the rainbow tests")
+    llog.cyan("slack links-and-ideas-bots receiving message...")
 
     // Check if the message is a bot message
     if (isBotMessage(message)) {
