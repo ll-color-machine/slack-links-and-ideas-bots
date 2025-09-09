@@ -2,11 +2,17 @@ const fs = require('fs').promises;
 const path = require('path');
 const llog = require('learninglab-log');
 
-const LOGS_DIR = '/Users/mk/Development/slack-links-and-ideas-bots/logs/payloads';
+// Portable payload log directory
+const IS_HEROKU = !!process.env.DYNO;
+const BASE_LOG_DIR = process.env.LOG_DIR || (IS_HEROKU ? path.join('/tmp', 'logs') : path.join(process.cwd(), 'logs'));
+const LOGS_DIR = process.env.PAYLOAD_LOG_DIR || path.join(BASE_LOG_DIR, 'payloads');
+// Gate file logging by env: default OFF on Heroku, ON locally unless overridden
+const ENABLE_FILE_LOG = String(process.env.PAYLOAD_FILE_LOG ?? (IS_HEROKU ? 'false' : 'true')).toLowerCase() === 'true';
 const MAX_FILES = 50;
 let logCounter = 1;
 
 async function ensureLogDir() {
+  if (!ENABLE_FILE_LOG) return;
   try {
     await fs.mkdir(LOGS_DIR, { recursive: true });
   } catch (error) {
@@ -35,6 +41,13 @@ async function logError(error, context = {}, type = 'error') {
 
 async function logPayload(prefix, payload, type) {
   try {
+    if (!ENABLE_FILE_LOG) {
+      // Echo a concise preview to console only
+      try {
+        llog.gray({ payload_log_preview: { prefix, type, size: JSON.stringify(payload)?.length || 0 } });
+      } catch (_) {}
+      return;
+    }
     await ensureLogDir();
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -60,6 +73,7 @@ async function logPayload(prefix, payload, type) {
 }
 
 async function cleanup() {
+  if (!ENABLE_FILE_LOG) return;
   try {
     const files = await fs.readdir(LOGS_DIR);
     const jsonFiles = files.filter(f => f.endsWith('.json')).sort();

@@ -3,6 +3,7 @@ const fsp = require("fs/promises");
 const path = require("path");
 const llog = require("learninglab-log");
 const airtableTools = require("../utils/ll-airtable-tools");
+const { WebClient } = require("@slack/web-api");
 
 const ROOT = global.ROOT_DIR || process.cwd();
 const CACHE_DIR = path.join(ROOT, "_cache");
@@ -37,7 +38,9 @@ async function readSnapshot() {
 // Persist only minimal arrays, not indices or loadedAt, to keep snapshot small and stable
 async function writeSnapshot(data) {
   try {
-    await ensureDir(CACHE_DIR);
+    // Ensure the directory of CACHE_PATH (supports external paths like /tmp/config.json)
+    const targetDir = path.dirname(CACHE_PATH);
+    await ensureDir(targetDir);
     const minimal = {
       users: data.users || [],
       emojis: data.emojis || [],
@@ -213,6 +216,8 @@ module.exports = {
   getRuntimeConfig,
   getEmojiAction,
   syncSlackUsersToAirtable,
+  syncSlackEmojisToAirtable,
+  ensureEmojiExists,
 };
 
 // --- Slack → Airtable Users sync (append-only, per workspace) ---
@@ -339,4 +344,66 @@ async function listAllSlackUsers(client) {
     cursor = resp.response_metadata?.next_cursor || undefined;
   } while (cursor);
   return out;
+}
+
+// --- Slack → Airtable Emojis sync (append-only for names; optional url/alias) ---
+async function syncSlackEmojisToAirtable() {
+  try {
+    const baseId = process.env.AIRTABLE_BASE_ID;
+    const table = process.env.AIRTABLE_TABLE_EMOJIS || "Emojis";
+    if (!process.env.AIRTABLE_API_TOKEN || !baseId) {
+      llog.gray("BKC: skip emojis sync (missing Airtable env)");
+      return { added: 0, total: 0 };
+    }
+
+    const token = process.env.SLACK_USER_TOKEN || process.env.SLACK_BOT_TOKEN;
+    if (!token) {
+      llog.gray("BKC: skip emojis sync (missing Slack token)");
+      return { added: 0, total: 0 };
+    }
+    const client = new WebClient(token);
+    const resp = await client.emoji.list().catch((e) => { llog.yellow(`emoji.list failed: ${e?.data?.error || e}`); return null; });
+    const emojiMap = resp?.emoji || {};
+    const names = Object.keys(emojiMap);
+    if (names.length === 0) return { added: 0, total: 0 };
+
+    // Fetch existing Airtable emoji names
+    const existing = await airtableTools.findMany({ baseId, table, maxRecords: 10000 });
+    const have = {};
+    for (const rec of existing || []) {
+      try { const n = String(rec.get("name") || rec.get("Name") || "").trim(); if (n) have[n] = true; } catch { }
+    }
+
+    let added = 0;
+    for (const name of names) {
+      if (have[name]) continue;
+      const fields = { name };
+      await airtableTools.addRecord({ baseId, table, record: fields }).catch(() => {});
+      added++;
+    }
+    llog.gray(`Emojis sync: ${added} added, ${names.length} total in Slack`);
+    return { added, total: names.length };
+  } catch (e) {
+    llog.yellow(`Emojis sync failed: ${e}`);
+    return { added: 0, total: 0 };
+  }
+}
+
+// Ensure an emoji name exists in the Airtable Emojis table.
+// Useful for auto-registering first-time reactions (including standard emojis).
+async function ensureEmojiExists(name) {
+  try {
+    const n = String(name || '').trim();
+    if (!n) return null;
+    if (state.emojisByName && state.emojisByName[n]) return state.emojisByName[n];
+    const baseId = process.env.AIRTABLE_BASE_ID;
+    const table = process.env.AIRTABLE_TABLE_EMOJIS || 'Emojis';
+    if (!process.env.AIRTABLE_API_TOKEN || !baseId) return null;
+    const rec = await airtableTools.addRecord({ baseId, table, record: { name: n } }).catch(()=>null);
+    if (rec) {
+      llog.gray(`Auto-registered emoji in Airtable: ${n}`);
+      await refreshRuntimeConfig().catch(()=>{});
+    }
+    return rec;
+  } catch (_) { return null; }
 }

@@ -33,7 +33,7 @@ async function createAndUploadImage(client, scene, prompt, thread_ts) {
   // 2. Download the image
   const timestamp = Date.now();
   const filename = `replicate_${timestamp}.webp`;
-  const tempDir = path.join(process.cwd(), '_temp');  // You can change this to your preferred temp folder.
+  const tempDir = '/tmp';
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }

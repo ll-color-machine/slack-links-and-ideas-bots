@@ -3,7 +3,8 @@ const airtableTools = require("../../utils/ll-airtable-tools");
 const { makeSlackImageUrl } = require("../../utils/ll-slack-tools/utils");
 
 // Create Airtable record for a PDF and (optionally) attach a public Slack URL
-async function savePdfRecordToAirtable({ metadata, file, fileName, webUser }) {
+// Accepts optional Slack context for cross-linking
+async function savePdfRecordToAirtable({ metadata, file, fileName, webUser, slackChannelId, slackMessageTs, slackUserId }) {
   const baseId = process.env.AIRTABLE_BASE_ID;
   const table = process.env.AIRTABLE_TABLE_PDFS || "PDFs";
   if (!baseId) throw new Error("AIRTABLE_BASE_ID env not set");
@@ -16,6 +17,15 @@ async function savePdfRecordToAirtable({ metadata, file, fileName, webUser }) {
   };
   if (metadata.year) fields.Year = metadata.year;
   if (metadata.link) fields.Link = metadata.link;
+  // Slack cross-refs (lowercase names to match emoji-bot expectations)
+  if (slackMessageTs) fields.slack_message_ts = slackMessageTs;
+  if (slackChannelId) fields.slack_channel_id = slackChannelId;
+  const slackUid = slackUserId || file?.user || null;
+  if (slackUid) fields.slack_user_id = slackUid;
+  try {
+    const postedById = global.APP_CONFIG?.usersById?.[slackUid]?.id;
+    if (postedById) fields._posted_by = [postedById];
+  } catch (_) {}
 
   let airtableRecord = await airtableTools.addRecord({ baseId, table, record: fields });
   try {

@@ -62,7 +62,15 @@ async function processFile(
         // 4) Save to Airtable (record first)
         let airtableRecord = null;
         try {
-          airtableRecord = await savePdfRecordToAirtable({ metadata, file, fileName, webUser });
+          airtableRecord = await savePdfRecordToAirtable({
+            metadata,
+            file,
+            fileName,
+            webUser,
+            slackChannelId: channelId,
+            slackMessageTs: thread_ts,
+            slackUserId: file?.user,
+          });
           if (airtableRecord?.id) {
             const baseId = process.env.AIRTABLE_BASE_ID;
             const tableId = process.env.AIRTABLE_PDFS_TABLE_ID || "tblbtIWkj4w8yiIuQ";

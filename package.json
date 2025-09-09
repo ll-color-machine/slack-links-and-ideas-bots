@@ -14,6 +14,9 @@
   "author": "mk",
   "type": "commonjs",
   "main": "app.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "NODE_ENV=dev nodemon",
@@ -28,6 +31,7 @@
     ]
   },
   "dependencies": {
+    "@mendable/firecrawl-js": "^4.3.4",
     "@slack/bolt": "^4.4.0",
     "airtable": "^0.12.2",
     "axios": "^1.11.0",

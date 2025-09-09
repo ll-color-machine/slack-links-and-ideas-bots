@@ -40,6 +40,7 @@ function formatLinkRecord(url, metadata, message) {
     url: url,
     title: metadata.title || "",
     description: metadata.description || "",
+    summary: metadata.summary || "",
     domain: metadata.domain || "",
     pathname: metadata.pathname || "",
     image_url: metadata.image || "",
@@ -94,12 +95,17 @@ async function linkExists(url, channelId, messageTs) {
     if (!baseId) return false;
     
     // Search for existing records with same URL and message timestamp
+    const filterByFormula = `AND({url} = '${url}', {slack_message_ts} = '${messageTs}')`;
     const existing = await airtableTools.findMany({
       baseId,
       table,
-      filterByFormula: `AND({url} = '${url}', {slack_message_ts} = '${messageTs}')`,
+      filterByFormula,
       maxRecords: 1,
     });
+    try {
+      const foundIds = (existing || []).map(r => r.id);
+      llog.gray({ linkExists_debug: { url, messageTs, count: existing?.length || 0, foundIds, filterByFormula } });
+    } catch (_) {}
     
     return existing && existing.length > 0;
   } catch (error) {

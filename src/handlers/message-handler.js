@@ -4,7 +4,7 @@ const rainbowTests = require('../bots/archive/rainbow-tests/index');
 const bkc = require('../bots/archive/bkc-bots');
 const payloadLogger = require('../utils/payload-logger');
 const { upsertSlackMessage } = require('../utils/save-slack-message');
-const linkBot = require('../bots/link-bot');
+const firecrawlBot = require('../bots/firecrawl-bot');
 
 const isBotMessage = (message) => {
     return message.subtype === "bot_message";
@@ -34,7 +34,7 @@ exports.parseAll = async ({ client, message, say, event }) => {
     }
 
     // Process links in the message (runs in parallel with other processing)
-    linkBot.handleMessage({ client, message, event }).catch(error => {
+    firecrawlBot.handleMessage({ client, message, event }).catch(error => {
         llog.red(`Link processing error: ${error}`);
     });
 

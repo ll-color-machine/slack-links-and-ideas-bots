@@ -26,22 +26,15 @@ app.message(/.*/, handleMessages.parseAll);
 app.event("file_shared", handlers.eventHandler.fileShared);
 app.event("reaction_added", handlers.eventHandler.reactionAdded);
 
-(async () => {
 
-  if (!fs.existsSync("_temp")) {
-    fs.mkdirSync("_temp");
-  }
-  if (!fs.existsSync("_output")) {
-    fs.mkdirSync("_output");
-  }
-  if (!fs.existsSync("_cache")) {
-    fs.mkdirSync("_cache");
-  }
+(async () => {
 
   // Warm runtime config (users, emojis, prompts, flows)
   await initRuntimeConfig();
   // Ensure Airtable Users table contains all Slack users for this workspace
   await syncSlackUsersToAirtable({ slackClient: app.client }).catch(()=>{});
+  // Ensure Airtable Emojis table contains workspace custom emoji names
+  await require('./src/config').syncSlackEmojisToAirtable().catch(()=>{});
   // Refresh config again to include any new/updated users immediately
   await refreshRuntimeConfig().catch(()=>{});
   await app.start(process.env.PORT || 3000);

@@ -134,21 +134,23 @@ module.exports.findManyByFormula = async function(options) {
 }
 
 module.exports.findMany = async function(options) {
-  var base = new Airtable({apiKey: process.env.AIRTABLE_API_TOKEN}).base(options.baseId);
+  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_TOKEN }).base(options.baseId);
   const theRecords = [];
-  await base(options.table).select(
-    {
-      maxRecords: options.maxRecords ? options.maxRecords : 10,
-      view: options.view ? options.view : "Grid view",
-    }
-  ).eachPage(function page(records, next){
-    theRecords.push(...records);
-    next()
-  })
-  // .then(()=>{
-  //   // return(theRecords);
-  // })
-  .catch(err=>{console.error(err); return})
+  const selectOpts = {
+    maxRecords: options.maxRecords ? options.maxRecords : 10,
+    view: options.view ? options.view : "Grid view",
+  };
+  if (options.filterByFormula) selectOpts.filterByFormula = options.filterByFormula;
+  if (options.sort) selectOpts.sort = options.sort;
+  await base(options.table)
+    .select(selectOpts)
+    .eachPage(function page(records, next) {
+      theRecords.push(...records);
+      next();
+    })
+    .catch((err) => {
+      console.error(err);
+      return;
+    });
   return theRecords;
 }
-

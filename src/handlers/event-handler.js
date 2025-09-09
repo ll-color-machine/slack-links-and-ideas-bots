@@ -3,6 +3,8 @@ const airtableTools = require(`../utils/ll-airtable-tools`);
 const { processFile: processPdfFile } = require("../bots/pdf-bot");
 const payloadLogger = require("../utils/payload-logger");
 const path = require("path");
+const emojiBot = require('../bots/emoji-bot');
+const { getEmojiAction } = require('../config');
 
 exports.fileShared = async ({ event, client }) => {
   try {
@@ -155,6 +157,21 @@ exports.reactionAdded = async ({ event, client }) => {
   } catch (err) {
     llog.red(`❌ Error handling books reaction: ${err}`);
   }
+  // Generic emoji agents via runtime config
+  try {
+    const emoji = String(event.reaction || '').trim();
+    let action = getEmojiAction(emoji);
+    if (!action) {
+      // Auto-register unknown emoji in Airtable for future configuration
+      try { await require('../config').ensureEmojiExists(emoji); } catch (_) {}
+      action = getEmojiAction(emoji); // try again after potential refresh
+    }
+    if (action && action.action_type === 'agent') {
+      llog.cyan({ emoji_agent_dispatch: { emoji, prompt_name: action.prompt_name } });
+      await emojiBot.handleReaction({ client, event });
+      return;
+    }
+  } catch (e) { llog.gray(`emoji agent dispatch failed: ${e}`); }
   if (event.reaction == "eyeglasses") {
     llog.blue("vision request");
     let result = await handleVisionRequest({ event, client });

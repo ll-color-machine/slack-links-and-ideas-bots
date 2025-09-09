@@ -6,10 +6,14 @@
 const fs = require('fs');
 const path = require('path');
 
-const LOG_DIR    = process.env.LOG_DIR    || path.join(process.cwd(), 'logs');
+// Prefer /tmp on Heroku (DYNO present); allow override via LOG_DIR
+const IS_HEROKU = !!process.env.DYNO;
+const DEFAULT_LOG_DIR = IS_HEROKU ? path.join('/tmp', 'logs') : path.join(process.cwd(), 'logs');
+const LOG_DIR    = process.env.LOG_DIR    || DEFAULT_LOG_DIR;
 const LOG_PREFIX = process.env.LOG_PREFIX || 'app';
 const LOG_KEEP   = parseInt(process.env.LOG_KEEP || '50', 10);
 const JSONL_KEEP = parseInt(process.env.JSONL_KEEP || '14', 10); // days/files to keep
+const LATEST_LINES = parseInt(process.env.LATEST_LINES || '500', 10); // lines to keep in latest.log
 
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
 const TEXT_DIR  = path.join(LOG_DIR, 'text');
@@ -24,6 +28,10 @@ let currentMinute = null;
 let stream = null; // text log stream
 let currentDay = null;
 let jsonlStream = null; // jsonl stream
+
+// Circular buffer for latest.log
+let latestBuffer = [];
+let latestLineBuffer = '';
 
 function stamp(d = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -89,6 +97,7 @@ function ensureStream() {
   const now = Math.floor(Date.now() / 60000);
   if (stream == null || now !== currentMinute) openStream(new Date());
   ensureJsonlStream();
+  ensureLatestStream();
 }
 
 // Strip ANSI only for file output; keep colors in terminal
@@ -133,6 +142,7 @@ function writeBoth(origWrite, chunk, encoding, cb) {
   const sanitized = redactSecrets(stripAnsi(text));
   stream.write(sanitized, 'utf8', cb);
   feedJsonl(sanitized);
+  feedLatest(sanitized);
 }
 
 process.stdout.write = (chunk, enc, cb) => writeBoth(origStdout, chunk, enc, cb);
@@ -140,6 +150,7 @@ process.stderr.write = (chunk, enc, cb) => writeBoth(origStderr, chunk, enc, cb)
 
 openStream();
 ensureJsonlStream();
+ensureLatestStream();
 setInterval(ensureStream, 1000);
 
 async function updateCurrentSymlink(targetPath) {
@@ -279,5 +290,30 @@ function flushJsonl() {
     jsonlStream.write(JSON.stringify(obj) + '\n');
   } catch (_) {
     // ignore if not valid JSON
+  }
+}
+
+// Latest log helpers - circular buffer maintaining last N lines
+function ensureLatestStream() { /* no-op */ }
+
+function feedLatest(text) {
+  if (!text) return;
+  latestLineBuffer += text;
+  let idx;
+  while ((idx = latestLineBuffer.indexOf('\n')) !== -1) {
+    const line = latestLineBuffer.slice(0, idx);
+    latestLineBuffer = latestLineBuffer.slice(idx + 1);
+    latestBuffer.push(line);
+    while (latestBuffer.length > LATEST_LINES) latestBuffer.shift();
+  }
+  writeLatestFile();
+}
+
+function writeLatestFile() {
+  const latestPath = path.join(TEXT_DIR, 'latest.log');
+  try {
+    fs.writeFileSync(latestPath, latestBuffer.join('\n'), 'utf8');
+  } catch (error) {
+    // Silently ignore write errors
   }
 }
