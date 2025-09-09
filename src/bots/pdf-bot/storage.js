@@ -14,6 +14,7 @@ async function savePdfRecordToAirtable({ metadata, file, fileName, webUser, slac
     Topic: metadata.topic,
     StudyType: metadata.study_type,
     Summary: metadata.summary,
+    environment: process.env.NODE_ENV || 'production',
   };
   if (metadata.year) fields.Year = metadata.year;
   if (metadata.link) fields.Link = metadata.link;

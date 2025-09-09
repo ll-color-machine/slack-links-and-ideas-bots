@@ -275,7 +275,7 @@ async function syncSlackUsersToAirtable({ slackClient }) {
       const imageAttachment = avatar ? [{ url: avatar.url, filename: avatar.filename }] : undefined;
       const userJson = JSON.stringify(u);
       if (!existingRec) {
-        const record = { "slack_user_id": slackId, name, slack_user_json: userJson };
+        const record = { "slack_user_id": slackId, name, slack_user_json: userJson, environment: process.env.NODE_ENV || 'production' };
         if (imageAttachment) record[imageField] = imageAttachment;
         await airtableTools.addRecord({
           baseId,
@@ -355,7 +355,8 @@ async function syncSlackEmojisToAirtable() {
     const fieldName = process.env.AIRTABLE_EMOJIS_NAME_FIELD || "name";
     // Default URL field matches your screenshot: "public_image_link"
     const fieldUrl = process.env.AIRTABLE_EMOJIS_URL_FIELD || "public_image_link";
-    const fieldAlias = process.env.AIRTABLE_EMOJIS_ALIAS_FIELD || "alias";
+    // Optional alias field (disabled by default); set env to enable
+    const fieldAlias = process.env.AIRTABLE_EMOJIS_ALIAS_FIELD || null;
     const fieldImage = process.env.AIRTABLE_EMOJIS_IMAGE_FIELD || "image"; // Attachment field
     const fieldType = process.env.AIRTABLE_EMOJIS_TYPE_FIELD || null; // Optional single select/text
     if (!process.env.AIRTABLE_API_TOKEN || !baseId) {
@@ -388,7 +389,7 @@ async function syncSlackEmojisToAirtable() {
           existingMap[n] = {
             id: rec.id,
             url: rec.get(fieldUrl) || rec.get("public_image_link") || rec.get("url") || rec.get("URL"),
-            alias: rec.get(fieldAlias) || rec.get("alias") || rec.get("Alias"),
+            alias: fieldAlias ? (rec.get(fieldAlias) || rec.get("alias") || rec.get("Alias")) : undefined,
             hasImage: !!(rec.get(fieldImage) || rec.get("image") || rec.get("Image")),
             type: fieldType ? rec.get(fieldType) : undefined
           };
@@ -416,24 +417,24 @@ async function syncSlackEmojisToAirtable() {
       const attachment = url && url.startsWith('http') ? [{ url }] : undefined;
 
       if (!have[name]) {
-        const fields = { [fieldName]: name };
+        const fields = { [fieldName]: name, environment: process.env.NODE_ENV || 'production' };
         if (url) fields[fieldUrl] = url;
-        if (alias) fields[fieldAlias] = alias;
+        if (fieldAlias && alias) fields[fieldAlias] = alias;
         if (attachment) fields[fieldImage] = attachment;
         if (fieldType) fields[fieldType] = fields[fieldType] || "custom";
-        await airtableTools.addRecord({ baseId, table, record: fields }).catch(() => {});
-        added++;
+        const addRes = await airtableTools.addRecord({ baseId, table, record: fields }).catch(() => null);
+        if (addRes && addRes.id) added++;
       } else {
         // Update missing url/alias/image if not present
         const ex = existingMap[name] || {};
         const toUpdate = {};
         if (url && !ex.url) toUpdate[fieldUrl] = url;
-        if (alias && !ex.alias) toUpdate[fieldAlias] = alias;
+        if (fieldAlias && alias && !ex.alias) toUpdate[fieldAlias] = alias;
         if (attachment && !ex.hasImage) toUpdate[fieldImage] = attachment;
         if (fieldType && !ex.type) toUpdate[fieldType] = "custom";
         if (Object.keys(toUpdate).length && ex.id) {
-          await airtableTools.updateRecord({ baseId, table, recordId: ex.id, updatedFields: toUpdate }).catch(() => {});
-          updated++;
+          const upRes = await airtableTools.updateRecord({ baseId, table, recordId: ex.id, updatedFields: toUpdate }).catch(() => null);
+          if (upRes && upRes.id) updated++;
         }
       }
     }
@@ -455,7 +456,7 @@ async function ensureEmojiExists(name) {
     const baseId = process.env.AIRTABLE_BASE_ID;
     const table = process.env.AIRTABLE_TABLE_EMOJIS || 'Emojis';
     if (!process.env.AIRTABLE_API_TOKEN || !baseId) return null;
-    const rec = await airtableTools.addRecord({ baseId, table, record: { name: n } }).catch(()=>null);
+    const rec = await airtableTools.addRecord({ baseId, table, record: { name: n, environment: process.env.NODE_ENV || 'production' } }).catch(()=>null);
     if (rec) {
       llog.gray(`Auto-registered emoji in Airtable: ${n}`);
       await refreshRuntimeConfig().catch(()=>{});

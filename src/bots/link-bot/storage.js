@@ -35,6 +35,7 @@ async function fetchLinkMetadata(url) {
  */
 function formatLinkRecord(url, metadata, message) {
   const timestamp = new Date(parseFloat(message.ts) * 1000).toISOString();
+  const envVal = process.env.NODE_ENV || 'production';
   
   return {
     url: url,
@@ -49,6 +50,7 @@ function formatLinkRecord(url, metadata, message) {
     slack_user_id: message.user,
     slack_team_id: message.team,
     created_at: timestamp,
+    environment: envVal,
     link_metadata: JSON.stringify(metadata, null, 2),
     slack_message_json: JSON.stringify(message, null, 2),
     status: "pending", // For future processing workflow

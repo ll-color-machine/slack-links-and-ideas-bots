@@ -39,10 +39,16 @@ app.event("reaction_added", handlers.eventHandler.reactionAdded);
   await refreshRuntimeConfig().catch(()=>{});
   await app.start(process.env.PORT || 3000);
   llog.yellow("⚡️ Bolt app is running!");
-  let slackResult = await app.client.chat.postMessage({
-    channel: process.env.SLACK_LOGGING_CHANNEL,
-    text: "starting up the links-and-ideas-bots",
-  });
+  try {
+    if (process.env.SLACK_LOGGING_CHANNEL) {
+      await app.client.chat.postMessage({
+        channel: process.env.SLACK_LOGGING_CHANNEL,
+        text: "starting up the links-and-ideas-bots",
+      });
+    }
+  } catch (e) {
+    llog.yellow(`Slack startup post skipped: ${e?.data?.error || e}`);
+  }
 
   
 })();

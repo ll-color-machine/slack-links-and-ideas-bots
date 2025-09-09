@@ -25,6 +25,7 @@ module.exports.upsertSlackMessage = async function upsertSlackMessage({ message,
     const channel = String(event?.channel || message?.channel || '').trim();
     const userId = String(message?.user || '').trim();
     const json = JSON.stringify({ message, event });
+    const envVal = process.env.NODE_ENV || 'production';
 
     // Optional: link message -> Users table record by Slack ID
     const cfg = getRuntimeConfig ? getRuntimeConfig() : global.APP_CONFIG;
@@ -47,7 +48,7 @@ module.exports.upsertSlackMessage = async function upsertSlackMessage({ message,
         baseId,
         table,
         recordId: existing.id,
-        updatedFields: { slack_json: json, slack_channel: channel, ...linkPatch },
+        updatedFields: { slack_json: json, slack_channel: channel, environment: envVal, ...linkPatch },
       });
       if (hasUnknownFieldErr(res)) {
         llog.yellow(`Airtable field ${userField} missing; updating without user link`);
@@ -55,7 +56,7 @@ module.exports.upsertSlackMessage = async function upsertSlackMessage({ message,
           baseId,
           table,
           recordId: existing.id,
-          updatedFields: { slack_json: json, slack_channel: channel },
+          updatedFields: { slack_json: json, slack_channel: channel, environment: envVal },
         });
       }
       return { action: 'updated', id: existing.id };
@@ -64,14 +65,14 @@ module.exports.upsertSlackMessage = async function upsertSlackMessage({ message,
     let created = await airtableTools.addRecord({
       baseId,
       table,
-      record: { slack_ts: ts, slack_json: json, slack_channel: channel, ...linkPatch },
+      record: { slack_ts: ts, slack_json: json, slack_channel: channel, environment: envVal, ...linkPatch },
     });
     if (hasUnknownFieldErr(created)) {
       llog.yellow(`Airtable field ${userField} missing; creating without user link`);
       created = await airtableTools.addRecord({
         baseId,
         table,
-        record: { slack_ts: ts, slack_json: json, slack_channel: channel },
+        record: { slack_ts: ts, slack_json: json, slack_channel: channel, environment: envVal },
       });
     }
 

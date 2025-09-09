@@ -164,6 +164,7 @@ async function saveResponseToAirtable({ event, ctx, header, text, response, slac
     response_json: safeJson(response),
     slack_json: safeJson(slackDiscussPost || slackThreadPost || {}),
     _prompt: prompt || '',
+    environment: process.env.NODE_ENV || 'production',
     _requested_by_user: requestedById ? [requestedById] : undefined,
     _message_user: messageUserId ? [messageUserId] : undefined,
   };
