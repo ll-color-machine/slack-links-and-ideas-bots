@@ -346,11 +346,18 @@ async function listAllSlackUsers(client) {
   return out;
 }
 
-// --- Slack → Airtable Emojis sync (append-only for names; optional url/alias) ---
+// --- Slack → Airtable Emojis sync (append/update names + url + attachment) ---
 async function syncSlackEmojisToAirtable() {
   try {
     const baseId = process.env.AIRTABLE_BASE_ID;
     const table = process.env.AIRTABLE_TABLE_EMOJIS || "Emojis";
+    // Airtable field names (customize via env to match your base)
+    const fieldName = process.env.AIRTABLE_EMOJIS_NAME_FIELD || "name";
+    // Default URL field matches your screenshot: "public_image_link"
+    const fieldUrl = process.env.AIRTABLE_EMOJIS_URL_FIELD || "public_image_link";
+    const fieldAlias = process.env.AIRTABLE_EMOJIS_ALIAS_FIELD || "alias";
+    const fieldImage = process.env.AIRTABLE_EMOJIS_IMAGE_FIELD || "image"; // Attachment field
+    const fieldType = process.env.AIRTABLE_EMOJIS_TYPE_FIELD || null; // Optional single select/text
     if (!process.env.AIRTABLE_API_TOKEN || !baseId) {
       llog.gray("BKC: skip emojis sync (missing Airtable env)");
       return { added: 0, total: 0 };
@@ -372,19 +379,66 @@ async function syncSlackEmojisToAirtable() {
     // Fetch existing Airtable emoji names
     const existing = await airtableTools.findMany({ baseId, table, maxRecords: 10000 });
     const have = {};
+    const existingMap = {};
     for (const rec of existing || []) {
-      try { const n = String(rec.get("name") || rec.get("Name") || "").trim(); if (n) have[n] = true; } catch { }
+      try {
+        const n = String(rec.get("name") || rec.get("Name") || rec.get(fieldName) || "").trim();
+        if (n) {
+          have[n] = true;
+          existingMap[n] = {
+            id: rec.id,
+            url: rec.get(fieldUrl) || rec.get("public_image_link") || rec.get("url") || rec.get("URL"),
+            alias: rec.get(fieldAlias) || rec.get("alias") || rec.get("Alias"),
+            hasImage: !!(rec.get(fieldImage) || rec.get("image") || rec.get("Image")),
+            type: fieldType ? rec.get(fieldType) : undefined
+          };
+        }
+      } catch { }
     }
 
     let added = 0;
+    let updated = 0;
+    // Helper to resolve aliases to a concrete URL
+    const resolveEmoji = (n, depth = 0) => {
+      if (depth > 10) return { url: undefined, alias: undefined };
+      const val = emojiMap[n];
+      if (!val) return { url: undefined, alias: undefined };
+      if (typeof val === 'string' && val.startsWith('alias:')) {
+        const base = val.slice(6);
+        const r = resolveEmoji(base, depth + 1);
+        return { url: r.url, alias: base };
+      }
+      return { url: val, alias: undefined };
+    };
+
     for (const name of names) {
-      if (have[name]) continue;
-      const fields = { name };
-      await airtableTools.addRecord({ baseId, table, record: fields }).catch(() => {});
-      added++;
+      const { url, alias } = resolveEmoji(name);
+      const attachment = url && url.startsWith('http') ? [{ url }] : undefined;
+
+      if (!have[name]) {
+        const fields = { [fieldName]: name };
+        if (url) fields[fieldUrl] = url;
+        if (alias) fields[fieldAlias] = alias;
+        if (attachment) fields[fieldImage] = attachment;
+        if (fieldType) fields[fieldType] = fields[fieldType] || "custom";
+        await airtableTools.addRecord({ baseId, table, record: fields }).catch(() => {});
+        added++;
+      } else {
+        // Update missing url/alias/image if not present
+        const ex = existingMap[name] || {};
+        const toUpdate = {};
+        if (url && !ex.url) toUpdate[fieldUrl] = url;
+        if (alias && !ex.alias) toUpdate[fieldAlias] = alias;
+        if (attachment && !ex.hasImage) toUpdate[fieldImage] = attachment;
+        if (fieldType && !ex.type) toUpdate[fieldType] = "custom";
+        if (Object.keys(toUpdate).length && ex.id) {
+          await airtableTools.updateRecord({ baseId, table, recordId: ex.id, updatedFields: toUpdate }).catch(() => {});
+          updated++;
+        }
+      }
     }
-    llog.gray(`Emojis sync: ${added} added, ${names.length} total in Slack`);
-    return { added, total: names.length };
+    llog.gray(`Emojis sync: ${added} added, ${updated} updated, ${names.length} total in Slack`);
+    return { added, updated, total: names.length };
   } catch (e) {
     llog.yellow(`Emojis sync failed: ${e}`);
     return { added: 0, total: 0 };
