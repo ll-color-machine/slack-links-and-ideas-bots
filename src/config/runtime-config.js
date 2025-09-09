@@ -356,7 +356,9 @@ async function syncSlackEmojisToAirtable() {
       return { added: 0, total: 0 };
     }
 
-    const token = process.env.SLACK_USER_TOKEN || process.env.SLACK_BOT_TOKEN;
+    // Prefer bot token for emoji.list since bot has emoji:read in your app
+    // Fallback to user token only if a bot token isn't available
+    const token = process.env.SLACK_BOT_TOKEN || process.env.SLACK_USER_TOKEN;
     if (!token) {
       llog.gray("BKC: skip emojis sync (missing Slack token)");
       return { added: 0, total: 0 };
