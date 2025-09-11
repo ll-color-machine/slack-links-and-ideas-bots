@@ -18,14 +18,13 @@ async function savePdfRecordToAirtable({ metadata, file, fileName, webUser, slac
   };
   if (metadata.year) fields.Year = metadata.year;
   if (metadata.link) fields.Link = metadata.link;
-  // Slack cross-refs (lowercase names to match emoji-bot expectations)
+  // Slack cross-refs stored on PDFs table (only fields that exist in your base)
   if (slackMessageTs) fields.slack_message_ts = slackMessageTs;
-  if (slackChannelId) fields.slack_channel_id = slackChannelId;
   const slackUid = slackUserId || file?.user || null;
-  if (slackUid) fields.slack_user_id = slackUid;
   try {
     const postedById = global.APP_CONFIG?.usersById?.[slackUid]?.id;
-    if (postedById) fields._posted_by = [postedById];
+    // Your base uses `_user` (link to Users) rather than `_posted_by`
+    if (postedById) fields._user = [postedById];
   } catch (_) {}
 
   let airtableRecord = await airtableTools.addRecord({ baseId, table, record: fields });

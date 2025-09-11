@@ -275,7 +275,7 @@ async function syncSlackUsersToAirtable({ slackClient }) {
       const imageAttachment = avatar ? [{ url: avatar.url, filename: avatar.filename }] : undefined;
       const userJson = JSON.stringify(u);
       if (!existingRec) {
-        const record = { "slack_user_id": slackId, name, slack_user_json: userJson, environment: process.env.NODE_ENV || 'production' };
+        const record = { "slack_user_id": slackId, name, slack_user_json: userJson };
         if (imageAttachment) record[imageField] = imageAttachment;
         await airtableTools.addRecord({
           baseId,
@@ -417,7 +417,7 @@ async function syncSlackEmojisToAirtable() {
       const attachment = url && url.startsWith('http') ? [{ url }] : undefined;
 
       if (!have[name]) {
-        const fields = { [fieldName]: name, environment: process.env.NODE_ENV || 'production' };
+        const fields = { [fieldName]: name };
         if (url) fields[fieldUrl] = url;
         if (fieldAlias && alias) fields[fieldAlias] = alias;
         if (attachment) fields[fieldImage] = attachment;
@@ -456,7 +456,7 @@ async function ensureEmojiExists(name) {
     const baseId = process.env.AIRTABLE_BASE_ID;
     const table = process.env.AIRTABLE_TABLE_EMOJIS || 'Emojis';
     if (!process.env.AIRTABLE_API_TOKEN || !baseId) return null;
-    const rec = await airtableTools.addRecord({ baseId, table, record: { name: n, environment: process.env.NODE_ENV || 'production' } }).catch(()=>null);
+    const rec = await airtableTools.addRecord({ baseId, table, record: { name: n } }).catch(()=>null);
     if (rec) {
       llog.gray(`Auto-registered emoji in Airtable: ${n}`);
       await refreshRuntimeConfig().catch(()=>{});
