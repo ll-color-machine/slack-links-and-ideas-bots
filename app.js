@@ -39,6 +39,11 @@ app.event("reaction_added", handlers.eventHandler.reactionAdded);
   await refreshRuntimeConfig().catch(()=>{});
   await app.start(process.env.PORT || 3000);
   llog.yellow(`⚡️ Bolt app is running in ${process.env.NODE_ENV} mode!`);
+  // Log channel gating configuration for visibility across envs
+  try {
+    const gate = /^(1|true|yes|on)$/i.test(String(process.env.LINKS_CHANNEL_ONLY || 'false'));
+    llog.gray({ startup_channel_gate: { env: process.env.NODE_ENV, LINKS_CHANNEL_ONLY: gate, SLACK_LINKS_CHANNEL: process.env.SLACK_LINKS_CHANNEL || '' } });
+  } catch (_) {}
   try {
     if (process.env.SLACK_LOGGING_CHANNEL) {
       await app.client.chat.postMessage({

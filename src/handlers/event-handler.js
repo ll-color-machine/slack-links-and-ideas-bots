@@ -6,6 +6,18 @@ const path = require("path");
 const emojiBot = require('../bots/emoji-bot');
 const { getEmojiAction } = require('../config');
 
+function linksChannelGate(channelId) {
+  try {
+    const only = /^(1|true|yes|on)$/i.test(String(process.env.LINKS_CHANNEL_ONLY || 'false'));
+    const target = String(process.env.SLACK_LINKS_CHANNEL || '').trim();
+    const ok = !only || !target || channelId === target;
+    if (!ok) {
+      llog.gray({ links_channel_only_skip: { env: process.env.NODE_ENV, in: channelId, allowed: target } });
+    }
+    return ok;
+  } catch (_) { return true; }
+}
+
 exports.fileShared = async ({ event, client }) => {
   try {
     await payloadLogger.logEvent(event, 'file_shared');
@@ -13,6 +25,9 @@ exports.fileShared = async ({ event, client }) => {
 
     const fileId = event.file_id;
     const channelId = event.channel_id;
+
+    // Respect LINKS_CHANNEL_ONLY if set
+    if (!linksChannelGate(channelId)) return;
 
     if (!fileId) {
       llog.red("❌ No file_id in file_shared event");
@@ -120,6 +135,11 @@ const explainRequest = async ({ event, client }) => {
 exports.reactionAdded = async ({ event, client }) => {
   await payloadLogger.logEvent(event, 'reaction_added');
   llog.yellow(`got a reactionAdded: ${event.type}:`);
+  // Respect LINKS_CHANNEL_ONLY if set
+  try {
+    const ch = event?.item?.channel;
+    if (ch && !linksChannelGate(ch)) return;
+  } catch (_) {}
   // Trigger PDF processing when :books: is added to a message containing PDFs
   try {
     if (event.reaction === "books") {
