@@ -38,7 +38,7 @@ app.event("reaction_added", handlers.eventHandler.reactionAdded);
   // Refresh config again to include any new/updated users immediately
   await refreshRuntimeConfig().catch(()=>{});
   await app.start(process.env.PORT || 3000);
-  llog.yellow("⚡️ Bolt app is running!");
+  llog.yellow(`⚡️ Bolt app is running in ${process.env.NODE_ENV} mode!`);
   try {
     if (process.env.SLACK_LOGGING_CHANNEL) {
       await app.client.chat.postMessage({

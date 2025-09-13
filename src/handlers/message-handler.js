@@ -18,6 +18,16 @@ exports.parseAll = async ({ client, message, say, event }) => {
     await payloadLogger.logMessage(message, 'parseAll');
     // Save every message to Airtable (includes subthreads and bot messages)
     upsertSlackMessage({ message, event }).catch(()=>{});
+
+    // Optional: restrict active processing to a single links channel
+    try {
+        const linksChannelOnly = /^(1|true|yes|on)$/i.test(String(process.env.LINKS_CHANNEL_ONLY || 'false'));
+        const linksChannel = String(process.env.SLACK_LINKS_CHANNEL || '').trim();
+        if (linksChannelOnly && linksChannel && message.channel && message.channel !== linksChannel) {
+            llog.gray({ links_channel_only_skip: { in: message.channel, allowed: linksChannel } });
+            return; // still saved above; skip further processing
+        }
+    } catch (_) {}
     llog.cyan("slack links-and-ideas-bots receiving message...")
 
     // Check if the message is a bot message

@@ -35,12 +35,23 @@ async function savePdfRecordToAirtable({ metadata, file, fileName, webUser, slac
     llog.cyan("🗃️ Airtable PDF record created", { id: airtableRecord?.id, baseId, table, url });
   } catch (_) {}
 
-  // Optional: attach public Slack URL to Airtable if possible
+  // Optional: attach a public Slack URL to Airtable if possible.
+  // NOTE: Calling files.sharedPublicURL causes Slackbot to post a notice in the channel.
+  // To suppress those notices, set ALLOW_PUBLIC_FILE_LINKS=false (default) to skip making files public.
   try {
-    if (file?.id && webUser) {
-      const pub = await webUser.files.sharedPublicURL({ file: file.id });
-      const permalink = pub?.file?.permalink;
-      const permalink_public = pub?.file?.permalink_public;
+    const allowPublic = /^(1|true|yes|on)$/i.test(String(process.env.ALLOW_PUBLIC_FILE_LINKS || 'false'));
+    if (file?.id) {
+      let permalink = file.permalink; // may exist on event payload
+      let permalink_public = file.permalink_public; // only present if already public
+
+      // Prefer existing public link if available; avoid creating a new one
+      if (!permalink_public && allowPublic && webUser) {
+        // This call may trigger a Slackbot message in the channel
+        const pub = await webUser.files.sharedPublicURL({ file: file.id });
+        permalink = pub?.file?.permalink || permalink;
+        permalink_public = pub?.file?.permalink_public || permalink_public;
+      }
+
       if (permalink && permalink_public) {
         const publicUrl = makeSlackImageUrl(permalink, permalink_public);
         const updated = await airtableTools.updateRecord({

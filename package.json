@@ -19,7 +19,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "NODE_ENV=dev nodemon",
+    "dev": "NODE_ENV=dev nodemon --require ./console-file-logger.cjs app.js",
     "start": "NODE_ENV=production node --require ./console-file-logger.cjs app.js"
   },
   "nodemonConfig": {
